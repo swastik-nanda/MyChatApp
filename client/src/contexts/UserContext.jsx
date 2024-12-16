@@ -7,10 +7,22 @@ export function UserContextProvider({ children }) {
   const [id, setId] = useState(null);
 
   useEffect(() => {
-    axios.get("/profile").then((res) => {
-      console.log(res.data);
-    });
+    const fetchProfile = async () => {
+      try {
+        const res = await axios.get("/profile");
+        console.log("Profile response:", res.data);
+        setId(res.data.userId);
+        setUsername(res.data.username);
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
+        setId(null);
+        setUsername(null);
+      }
+    };
+
+    fetchProfile(); // Call the async function
   }, []);
+
   return (
     <UserContext.Provider value={{ username, setUsername, id, setId }}>
       {children}
