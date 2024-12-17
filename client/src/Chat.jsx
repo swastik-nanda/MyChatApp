@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import Avatar from "./Avatar";
 
 export default function Chat() {
   const [message, setMessage] = useState("");
@@ -54,8 +55,14 @@ export default function Chat() {
           MyChat
         </div>
         {Object.keys(onlinePeople).map((userId, index) => (
-          <div className="border-b border-gray-100 py-2" key={index}>
-            {onlinePeople[userId]}
+          <div
+            className="border-b border-gray-100 py-2 flex gap-2 items-center cursor-pointer"
+            key={index}
+          >
+            <Avatar username={onlinePeople[userId]} userId={userId}></Avatar>
+            <span className="text-md text-gray-800">
+              {onlinePeople[userId]}
+            </span>
           </div>
         ))}
       </div>

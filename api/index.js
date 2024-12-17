@@ -120,9 +120,7 @@ app.get("/profile", (req, res) => {
   }
 });
 
-const server = app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+const server = app.listen(port);
 
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (connection, req) => {
