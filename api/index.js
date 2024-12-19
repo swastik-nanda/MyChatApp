@@ -7,13 +7,14 @@ const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
 const User = require("./models/UserModel");
+const Message = require("./models/Message");
 
 dotenv.config();
 
 const mongoURL = process.env.MONGO_CONNECTION_STRING;
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.CLIENT_URL; // Default to local if not set
-const port = process.env.PORT; // Use PORT from .env or default to 4000
+const port = process.env.PORT || 5000; // Use PORT from .env or default to 4000
 
 mongoose.connect(mongoURL);
 const bcryptSalt = bcrypt.genSaltSync(10);
@@ -124,6 +125,7 @@ const server = app.listen(port);
 
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (connection, req) => {
+  // Read username and id from the cookie for this connection
   const cookies = req.headers.cookie;
   if (cookies) {
     const tokenCookieString = cookies
@@ -142,6 +144,35 @@ wss.on("connection", (connection, req) => {
     }
   }
 
+  connection.on("message", async (message) => {
+    try {
+      const messageData = JSON.parse(message.toString());
+      const { recipient, text } = messageData;
+      if (recipient && text) {
+        const messageDoc = await Message.create({
+          sender: connection.userId,
+          recipient: recipient,
+          text: text,
+        });
+        [...wss.clients]
+          .filter((c) => c.userId === recipient)
+          .forEach((c) =>
+            c.send(
+              JSON.stringify({
+                text,
+                sender: connection.userId,
+                recipient: recipient,
+                id: messageDoc._id,
+              })
+            )
+          );
+      }
+    } catch (err) {
+      console.error("Failed to process message:", err);
+    }
+  });
+
+  // Notify about connected online users
   [...wss.clients].forEach((client) => {
     client.send(
       JSON.stringify({
