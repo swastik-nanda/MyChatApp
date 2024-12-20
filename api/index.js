@@ -32,6 +32,22 @@ app.use(
   })
 );
 
+async function getUserDataFromReq(req) {
+  return new Promise((resolve, reject) => {
+    const token = req.cookies?.token;
+    if (token) {
+      jwt.verify(token, jwtSecret, {}, (err, decoded) => {
+        if (err) {
+          return res.status(401).json({ message: "Invalid or expired token" });
+        }
+        resolve(decoded);
+      });
+    } else {
+      reject("no token");
+    }
+  });
+}
+
 app.options("*", (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", frontendURL);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -42,6 +58,20 @@ app.options("*", (req, res) => {
 
 app.get("/test", (req, res) => {
   res.status(200).json("test ok");
+});
+
+app.get("/messages/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const userData = await getUserDataFromReq(req);
+  const ourUserId = userData.userId;
+  const history = await Message.find({
+    sender: { $in: [userId, ourUserId] },
+    recipient: { $in: [userId, ourUserId] },
+  }).sort({ createdAt: -1 });
+
+  res.status(200).json({
+    history,
+  });
 });
 
 app.post("/register", async (req, res) => {
