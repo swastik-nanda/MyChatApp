@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useContext } from "react";
 import { UserContext } from "./contexts/UserContext";
+import { uniqBy } from "lodash";
 import Avatar from "./Avatar";
 import Logo from "./Logo";
 import axios from "axios";
@@ -27,7 +28,6 @@ export default function Chat() {
     const handleMessage = (ev) => {
       try {
         const messageData = JSON.parse(ev.data);
-        console.log({ ev, messageData });
         if ("online" in messageData) {
           showOnlinePeople(messageData.online);
         } else if ("text" in messageData) {
@@ -68,7 +68,7 @@ export default function Chat() {
           text: message,
           sender: id,
           recipient: selectedUserId,
-          id: Date.now(),
+          _id: Date.now(),
         },
       ]);
     }
@@ -82,13 +82,31 @@ export default function Chat() {
   }, [textMessages]);
 
   useEffect(() => {
-    if (selectedUserId) {
-      axios.get("/messages/" + selectedUserId);
-    }
+    const fetchMessages = async () => {
+      if (selectedUserId) {
+        try {
+          const res = await axios.get(`/messages/${selectedUserId}`);
+          const { history } = res.data;
+          if (Array.isArray(history)) {
+            setTextMessages(history);
+          } else {
+            console.error("Unexpected response format:", res.data);
+            setTextMessages([]); // Default to empty array if data is not an array
+          }
+        } catch (error) {
+          console.error("Error fetching messages:", error);
+          setTextMessages([]); // Handle fetch error gracefully
+        }
+      }
+    };
+
+    fetchMessages();
   }, [selectedUserId]);
 
   const onlinePeopleExcludingUser = { ...onlinePeople };
   delete onlinePeopleExcludingUser[id];
+
+  const messagesWithoutDupes = uniqBy(textMessages, "_id");
 
   return (
     <div className="flex h-screen">
@@ -127,28 +145,27 @@ export default function Chat() {
           {!!selectedUserId && (
             <div className="relative h-full">
               <div className="overflow-y-scroll absolute top-0 right-0 left-0 bottom-2">
-                {textMessages.map((text, index) => (
-                  <div
-                    key={index}
-                    className={text.sender === id ? "text-right" : "text-left"}
-                  >
+                {Array.isArray(messagesWithoutDupes) &&
+                  messagesWithoutDupes.map((text, index) => (
                     <div
-                      className={
-                        "p-2 my-2 rounded-md text-md mx-2 inline-block text-left " +
-                        (text.sender === id
-                          ? "bg-blue-700 text-white"
-                          : "bg-white text-gray-500")
-                      }
                       key={index}
+                      className={
+                        text.sender === id ? "text-right" : "text-left"
+                      }
                     >
-                      sender: {text.sender}
-                      <br></br>
-                      my id: {id}
-                      <br></br>
-                      {text.text}
+                      <div
+                        className={
+                          "p-2 my-2 rounded-md text-md mx-2 inline-block text-left " +
+                          (text.sender === id
+                            ? "bg-blue-700 text-white"
+                            : "bg-white text-gray-500")
+                        }
+                        key={index}
+                      >
+                        {text.text}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
                 <div ref={divUnderMessages}></div>
               </div>
             </div>
