@@ -10,6 +10,7 @@ export default function Chat() {
   const [onlinePeople, setOnlinePeople] = useState({});
   const [selectedUserId, setSelectedUserId] = useState(null);
   const { id } = useContext(UserContext);
+  const divUnderMessages = useRef();
 
   function showOnlinePeople(peopleArray) {
     const people = {};
@@ -67,6 +68,13 @@ export default function Chat() {
     }
   }
 
+  useEffect(() => {
+    const div = divUnderMessages.current;
+    if (div) {
+      div.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [textMessages]);
+
   const onlinePeopleExcludingUser = { ...onlinePeople };
   delete onlinePeopleExcludingUser[id];
 
@@ -105,29 +113,32 @@ export default function Chat() {
             </div>
           )}
           {!!selectedUserId && (
-            <div className="overflow-scroll overflow-x-hidden">
-              {textMessages.map((text, index) => (
-                <div
-                  key={index}
-                  className={text.sender === id ? "text-right" : "text-left"}
-                >
+            <div className="relative h-full">
+              <div className="overflow-y-scroll absolute top-0 right-0 left-0 bottom-2">
+                {textMessages.map((text, index) => (
                   <div
-                    className={
-                      "p-2 my-2 rounded-md text-md mx-2 inline-block text-left " +
-                      (text.sender === id
-                        ? "bg-blue-700 text-white"
-                        : "bg-white text-gray-500")
-                    }
                     key={index}
+                    className={text.sender === id ? "text-right" : "text-left"}
                   >
-                    sender: {text.sender}
-                    <br></br>
-                    my id: {id}
-                    <br></br>
-                    {text.text}
+                    <div
+                      className={
+                        "p-2 my-2 rounded-md text-md mx-2 inline-block text-left " +
+                        (text.sender === id
+                          ? "bg-blue-700 text-white"
+                          : "bg-white text-gray-500")
+                      }
+                      key={index}
+                    >
+                      sender: {text.sender}
+                      <br></br>
+                      my id: {id}
+                      <br></br>
+                      {text.text}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+                <div ref={divUnderMessages}></div>
+              </div>
             </div>
           )}
         </div>
