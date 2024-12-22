@@ -1,15 +1,16 @@
 import { useEffect, useState, useRef, useContext } from "react";
 import { UserContext } from "./contexts/UserContext";
 import { uniqBy } from "lodash";
-import Avatar from "./Avatar";
 import Logo from "./Logo";
 import axios from "axios";
+import Contact from "./Contact";
 
 export default function Chat() {
   const [message, setMessage] = useState("");
   const [textMessages, setTextMessages] = useState([]);
   const wsConnection = useRef(null);
   const [onlinePeople, setOnlinePeople] = useState({});
+  const [offlinePeople, setOfflinePeople] = useState({});
   const [selectedUserId, setSelectedUserId] = useState(null);
   const { id } = useContext(UserContext);
   const divUnderMessages = useRef();
@@ -82,6 +83,26 @@ export default function Chat() {
   }, [textMessages]);
 
   useEffect(() => {
+    async function renderOfflineUsers() {
+      if (!onlinePeople || Object.keys(onlinePeople).length === 0) return; // Wait until onlinePeople is populated
+
+      try {
+        const res = await axios.get("people");
+        const offlineUsers = res.data.users
+          .filter((person) => person._id !== id)
+          .filter((person) => !Object.keys(onlinePeople).includes(person._id));
+        offlineUsers.forEach((p) => {
+          offlinePeople[p._id] = p;
+        });
+        setOfflinePeople(offlinePeople);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+    renderOfflineUsers();
+  }, [onlinePeople, id]);
+
+  useEffect(() => {
     const fetchMessages = async () => {
       if (selectedUserId) {
         try {
@@ -107,30 +128,29 @@ export default function Chat() {
   delete onlinePeopleExcludingUser[id];
 
   const messagesWithoutDupes = uniqBy(textMessages, "_id");
-
   return (
     <div className="flex h-screen">
       <div className="bg-blue-100 w-1/3">
         <Logo></Logo>
         {Object.keys(onlinePeopleExcludingUser).map((userId, index) => (
-          <div
-            onClick={() => setSelectedUserId(userId)}
-            className={
-              "border-b border-gray-100 flex gap-2 items-center cursor-pointer " +
-              (userId === selectedUserId ? "bg-blue-200" : "")
-            }
+          <Contact
             key={index}
-          >
-            {userId === selectedUserId && (
-              <div className="w-1 h-12 bg-blue-600 rounded-r-md"></div>
-            )}
-            <div className="py-2 pl-4 flex gap-2 items-center">
-              <Avatar username={onlinePeople[userId]} userId={userId}></Avatar>
-              <span className="text-md text-gray-800">
-                {onlinePeople[userId]}
-              </span>
-            </div>
-          </div>
+            online={true}
+            userId={userId}
+            setSelectedUserId={setSelectedUserId}
+            username={onlinePeople[userId]}
+            selected={userId === selectedUserId}
+          />
+        ))}
+        {Object.keys(offlinePeople).map((userId, index) => (
+          <Contact
+            key={index}
+            online={false}
+            userId={userId}
+            setSelectedUserId={setSelectedUserId}
+            username={offlinePeople[userId].username}
+            selected={userId === selectedUserId}
+          ></Contact>
         ))}
       </div>
       <div className="bg-blue-300 w-2/3 p-2 flex flex-col">

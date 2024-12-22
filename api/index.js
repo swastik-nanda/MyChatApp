@@ -151,6 +151,13 @@ app.get("/profile", (req, res) => {
   }
 });
 
+app.get("/people", async (req, res) => {
+  const allUsers = await User.find({}, { _id: 1, username: 1 });
+  res.status(200).json({
+    users: allUsers,
+  });
+});
+
 const server = app.listen(port);
 
 const wss = new ws.WebSocketServer({ server });
