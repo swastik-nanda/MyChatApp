@@ -21,6 +21,15 @@ export default function Chat() {
       people[userId] = username;
     });
     setOnlinePeople(people);
+
+    // Remove online users from offlinePeople
+    setOfflinePeople((prevOfflinePeople) => {
+      const updatedOfflinePeople = { ...prevOfflinePeople };
+      peopleArray.forEach(({ userId }) => {
+        delete updatedOfflinePeople[userId];
+      });
+      return updatedOfflinePeople;
+    });
   }
 
   function connectToWs() {
@@ -84,17 +93,18 @@ export default function Chat() {
 
   useEffect(() => {
     async function renderOfflineUsers() {
-      if (!onlinePeople || Object.keys(onlinePeople).length === 0) return; // Wait until onlinePeople is populated
+      if (!onlinePeople || Object.keys(onlinePeople).length === 0) return;
 
       try {
         const res = await axios.get("people");
         const offlineUsers = res.data.users
           .filter((person) => person._id !== id)
           .filter((person) => !Object.keys(onlinePeople).includes(person._id));
+        const updatedOfflinePeople = {};
         offlineUsers.forEach((p) => {
-          offlinePeople[p._id] = p;
+          updatedOfflinePeople[p._id] = p;
         });
-        setOfflinePeople(offlinePeople);
+        setOfflinePeople(updatedOfflinePeople);
       } catch (err) {
         console.log(err);
       }
