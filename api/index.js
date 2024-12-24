@@ -158,6 +158,12 @@ app.get("/people", async (req, res) => {
   });
 });
 
+app.post("/logout", (req, res) => {
+  res.cookie("token", "", { sameSite: "none", secure: true }).status(200).json({
+    message: "Logged out!",
+  });
+});
+
 const server = app.listen(port);
 
 const wss = new ws.WebSocketServer({ server });
@@ -181,6 +187,7 @@ wss.on("connection", (connection, req) => {
     connection.ping();
     connection.deathTimer = setTimeout(() => {
       connection.isAlive = false;
+      clearInterval(connection.timer);
       connection.terminate();
       notifyAbtOnlineUsers();
     }, 1000);

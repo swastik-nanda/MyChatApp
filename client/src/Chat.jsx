@@ -4,6 +4,9 @@ import { uniqBy } from "lodash";
 import Logo from "./Logo";
 import axios from "axios";
 import Contact from "./Contact";
+import LogoutButton from "./LogoutButton";
+import SendButton from "./SendButton";
+import UserDetailLogo from "./UserDetailLogo";
 
 export default function Chat() {
   const [message, setMessage] = useState("");
@@ -12,15 +15,20 @@ export default function Chat() {
   const [onlinePeople, setOnlinePeople] = useState({});
   const [offlinePeople, setOfflinePeople] = useState({});
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const { id } = useContext(UserContext);
+  const { username, id, setId, setUsername } = useContext(UserContext);
   const divUnderMessages = useRef();
+  const prevOnlinePeopleRef = useRef(onlinePeople); // For comparison
 
   function showOnlinePeople(peopleArray) {
     const people = {};
     peopleArray.forEach(({ userId, username }) => {
       people[userId] = username;
     });
-    setOnlinePeople(people);
+
+    setOnlinePeople((prev) => {
+      const hasChanged = JSON.stringify(prev) !== JSON.stringify(people);
+      return hasChanged ? people : prev;
+    });
 
     // Remove online users from offlinePeople
     setOfflinePeople((prevOfflinePeople) => {
@@ -64,7 +72,6 @@ export default function Chat() {
   function handleSendMessage(ev) {
     ev.preventDefault();
     if (wsConnection.current && selectedUserId && message) {
-      console.log("Sending message:", { recipient: selectedUserId, message });
       wsConnection.current.send(
         JSON.stringify({
           recipient: selectedUserId,
@@ -84,6 +91,13 @@ export default function Chat() {
     }
   }
 
+  function logout() {
+    axios.post("/logout").then(() => {
+      setId(null);
+      setUsername(null);
+    });
+  }
+
   useEffect(() => {
     const div = divUnderMessages.current;
     if (div) {
@@ -92,8 +106,17 @@ export default function Chat() {
   }, [textMessages]);
 
   useEffect(() => {
-    async function renderOfflineUsers() {
-      if (!onlinePeople || Object.keys(onlinePeople).length === 0) return;
+    const renderOfflineUsers = async () => {
+      if (
+        !onlinePeople ||
+        Object.keys(onlinePeople).length === 0 ||
+        JSON.stringify(prevOnlinePeopleRef.current) ===
+          JSON.stringify(onlinePeople)
+      ) {
+        return;
+      }
+
+      prevOnlinePeopleRef.current = onlinePeople;
 
       try {
         const res = await axios.get("people");
@@ -108,8 +131,10 @@ export default function Chat() {
       } catch (err) {
         console.log(err);
       }
-    }
-    renderOfflineUsers();
+    };
+
+    const debounceTimeout = setTimeout(renderOfflineUsers, 500); // Debounce API calls
+    return () => clearTimeout(debounceTimeout); // Cleanup on dependency change
   }, [onlinePeople, id]);
 
   useEffect(() => {
@@ -140,28 +165,35 @@ export default function Chat() {
   const messagesWithoutDupes = uniqBy(textMessages, "_id");
   return (
     <div className="flex h-screen">
-      <div className="bg-blue-100 w-1/3">
-        <Logo></Logo>
-        {Object.keys(onlinePeopleExcludingUser).map((userId, index) => (
-          <Contact
-            key={index}
-            online={true}
-            userId={userId}
-            setSelectedUserId={setSelectedUserId}
-            username={onlinePeople[userId]}
-            selected={userId === selectedUserId}
-          />
-        ))}
-        {Object.keys(offlinePeople).map((userId, index) => (
-          <Contact
-            key={index}
-            online={false}
-            userId={userId}
-            setSelectedUserId={setSelectedUserId}
-            username={offlinePeople[userId].username}
-            selected={userId === selectedUserId}
-          ></Contact>
-        ))}
+      <div className="bg-blue-100 w-1/3 flex flex-col">
+        <div className="flex-grow">
+          <Logo></Logo>
+          {Object.keys(onlinePeopleExcludingUser).map((userId, index) => (
+            <Contact
+              key={index}
+              online={true}
+              userId={userId}
+              setSelectedUserId={setSelectedUserId}
+              username={onlinePeople[userId]}
+              selected={userId === selectedUserId}
+            />
+          ))}
+          {Object.keys(offlinePeople).map((userId, index) => (
+            <Contact
+              key={index}
+              online={false}
+              userId={userId}
+              setSelectedUserId={setSelectedUserId}
+              username={offlinePeople[userId].username}
+              selected={userId === selectedUserId}
+            ></Contact>
+          ))}
+        </div>
+
+        <div className="p-2 flex gap-2 justify-center items-center">
+          <UserDetailLogo username={username}></UserDetailLogo>
+          <LogoutButton logout={logout}></LogoutButton>
+        </div>
       </div>
       <div className="bg-blue-300 w-2/3 p-2 flex flex-col">
         <div className="flex-grow">
@@ -210,25 +242,7 @@ export default function Chat() {
               className="bg-white border p-4 flex-grow rounded-lg"
               placeholder="Type your message here"
             />
-            <button
-              type="submit"
-              className="bg-blue-500 p-4 text-white rounded-lg"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-                className="size-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
-                />
-              </svg>
-            </button>
+            <SendButton></SendButton>
           </form>
         )}
       </div>
