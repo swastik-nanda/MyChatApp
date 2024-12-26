@@ -50,7 +50,9 @@ export default function Chat() {
         if ("online" in messageData) {
           showOnlinePeople(messageData.online);
         } else if ("text" in messageData) {
-          setTextMessages((t) => [...t, { ...messageData }]);
+          if (messageData.sender === selectedUserId) {
+            setTextMessages((t) => [...t, { ...messageData }]);
+          }
         }
       } catch (err) {
         console.error("Failed to parse message:", err);
