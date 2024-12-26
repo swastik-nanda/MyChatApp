@@ -7,6 +7,7 @@ import Contact from "./Contact";
 import LogoutButton from "./LogoutButton";
 import SendButton from "./SendButton";
 import UserDetailLogo from "./UserDetailLogo";
+import AttachmentButton from "./AttachmentButton";
 
 export default function Chat() {
   const [message, setMessage] = useState("");
@@ -69,26 +70,51 @@ export default function Chat() {
     connectToWs();
   }, []);
 
-  function handleSendMessage(ev) {
-    ev.preventDefault();
-    if (wsConnection.current && selectedUserId && message) {
-      wsConnection.current.send(
-        JSON.stringify({
-          recipient: selectedUserId,
-          text: message,
-        })
-      );
-      setMessage("");
-      setTextMessages((t) => [
-        ...t,
-        {
-          text: message,
-          sender: id,
-          recipient: selectedUserId,
-          _id: Date.now(),
-        },
-      ]);
+  async function handleSendMessage(ev, file = null) {
+    if (ev) ev.preventDefault();
+    wsConnection.current.send(
+      JSON.stringify({
+        recipient: selectedUserId,
+        text: message,
+        file,
+      })
+    );
+    setMessage("");
+    setTextMessages((t) => [
+      ...t,
+      {
+        text: message,
+        sender: id,
+        recipient: selectedUserId,
+        _id: Date.now(),
+      },
+    ]);
+    if (file) {
+      try {
+        const res = await axios.get(`/messages/${selectedUserId}`);
+        const { history } = res.data;
+        if (Array.isArray(history)) {
+          setTextMessages(history);
+        } else {
+          console.error("Unexpected response format:", res.data);
+          setTextMessages([]); // Default to empty array if data is not an array
+        }
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        setTextMessages([]); // Handle fetch error gracefully
+      }
     }
+  }
+
+  function sendFile(ev) {
+    const reader = new FileReader();
+    reader.readAsDataURL(ev.target.files[0]);
+    reader.onload = () => {
+      handleSendMessage(null, {
+        name: ev.target.files[0].name,
+        data: reader.result,
+      });
+    };
   }
 
   function logout() {
@@ -225,6 +251,33 @@ export default function Chat() {
                         key={index}
                       >
                         {text.text}
+                        {text.file && (
+                          <div className="">
+                            <a
+                              className="underline flex items-center gap-1"
+                              target="_blank"
+                              href={
+                                axios.defaults.baseURL + "/uploads/" + text.file
+                              }
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.5"
+                                stroke="currentColor"
+                                className="size-4"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"
+                                />
+                              </svg>
+                              {text.file}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -242,6 +295,7 @@ export default function Chat() {
               className="bg-white border p-4 flex-grow rounded-lg"
               placeholder="Type your message here"
             />
+            <AttachmentButton sendFile={sendFile}></AttachmentButton>
             <SendButton></SendButton>
           </form>
         )}

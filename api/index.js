@@ -1,4 +1,5 @@
 const ws = require("ws");
+const fs = require("fs");
 const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
@@ -20,6 +21,7 @@ mongoose.connect(mongoURL);
 const bcryptSalt = bcrypt.genSaltSync(10);
 const app = express();
 
+app.use("/uploads", express.static(__dirname + "/uploads"));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -219,19 +221,33 @@ wss.on("connection", (connection, req) => {
   connection.on("message", async (message) => {
     try {
       const messageData = JSON.parse(message.toString());
-      const { recipient, text } = messageData;
-      if (recipient && text) {
+      const { recipient, text, file } = messageData;
+      let fileName = null;
+      if (file) {
+        const fileParts = file.name.split(".");
+        const ext = fileParts[fileParts.length - 1];
+        fileName = Date.now() + "." + ext;
+        const path = __dirname + "/uploads/" + fileName;
+        const content = new Buffer(file.data.split(",")[1], "base64");
+        fs.writeFile(path, content, () => {
+          console.log("file saved " + path);
+        });
+      }
+      if (recipient && (text || file)) {
         const messageDoc = await Message.create({
           sender: connection.userId,
           recipient: recipient,
           text: text,
+          file: file ? fileName : null,
         });
+        console.log("Created message");
         [...wss.clients]
           .filter((c) => c.userId === recipient)
           .forEach((c) =>
             c.send(
               JSON.stringify({
                 text,
+                file: file ? fileName : null,
                 sender: connection.userId,
                 recipient: recipient,
                 _id: messageDoc._id,
